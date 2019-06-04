@@ -17,8 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
+from unittest.mock import patch
+
+from django.conf import settings
+from django.test.client import RequestFactory
+
 from dashboard.utils import (
-    clean_bounty_url, get_bounty, get_ordinal_repr, get_web3, getBountyContract, humanize_event_name,
+    clean_bounty_url, create_user_action, get_bounty, get_ordinal_repr, get_web3, getBountyContract,
+    humanize_event_name,
 )
 from test_plus.test import TestCase
 from web3.main import Web3
@@ -37,7 +43,10 @@ class DashboardUtilsTest(TestCase):
             assert isinstance(web3_provider, Web3)
             assert len(web3_provider.providers) == 1
             assert isinstance(web3_provider.providers[0], HTTPProvider)
-            assert web3_provider.providers[0].endpoint_uri == f'https://{network}.infura.io'
+            if settings.INFURA_USE_V3:
+                assert web3_provider.providers[0].endpoint_uri == f'https://{network}.infura.io/v3/{settings.INFURA_V3_PROJECT_ID}'
+            else:
+                assert web3_provider.providers[0].endpoint_uri == f'https://{network}.infura.io'
 
     @staticmethod
     def test_get_bounty_contract():
@@ -73,3 +82,35 @@ class DashboardUtilsTest(TestCase):
         """Test the humanized representation of an event name."""
         assert humanize_event_name('start_work') == 'WORK STARTED'
         assert humanize_event_name('remarket_funded_issue') == 'REMARKET_FUNDED_ISSUE'
+
+    @staticmethod
+    @patch('dashboard.utils.UserAction.objects')
+    def test_create_user_action_with_cookie(mockUserAction):
+        """Test the giving utm* in cookie should store in DB."""
+        request = RequestFactory().get('/login')
+        request.COOKIES['utm_source'] = 'test source'
+        request.COOKIES['utm_medium'] = 'test medium'
+        request.COOKIES['utm_campaign'] = 'test campaign'
+        create_user_action(None, 'Login', request)
+        mockUserAction.create.assert_called_once_with(action='Login', metadata={}, user=None,
+                                                      utm={'utm_source': 'test source',
+                                                           'utm_medium': 'test medium',
+                                                           'utm_campaign': 'test campaign'})
+
+    @staticmethod
+    @patch('dashboard.utils.UserAction.objects')
+    def test_create_user_action_without_cookie(mockUserAction):
+        """Test the giving utm* in cookie should store in DB as empty dict."""
+        request = RequestFactory().get('/login')
+        create_user_action(None, 'Login', request)
+        mockUserAction.create.assert_called_once_with(action='Login', metadata={}, user=None)
+
+    @staticmethod
+    @patch('dashboard.utils.UserAction.objects')
+    def test_create_user_action_with_partial_cookie(mockUserAction):
+        """Test the giving utm* in cookie should store partial utm in DB."""
+        request = RequestFactory().get('/login')
+        request.COOKIES['utm_campaign'] = 'test campaign'
+        create_user_action(None, 'Login', request)
+        mockUserAction.create.assert_called_once_with(action='Login', metadata={}, user=None,
+                                                      utm={'utm_campaign': 'test campaign'})

@@ -1,5 +1,5 @@
 '''
-    Copyright (C) 2017 Gitcoin Core
+    Copyright (C) 2019 Gitcoin Core
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as published
@@ -68,7 +68,7 @@ class Command(BaseCommand):
 
         titles = {
             'weekly_earners': _('Top Earners :money_with_wings: '),
-            'weekly_payers': _('Top Payers :moneybag: '),
+            'weekly_payers': _('Top Funders :moneybag: '),
             'weekly_orgs': _('Top Orgs :office: '),
             'weekly_tokens': _('Top Tokens :bank: '),
         }
